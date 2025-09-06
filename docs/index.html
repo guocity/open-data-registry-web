@@ -483,7 +483,9 @@
         // Load saved datasets from localStorage
         const savedNames = loadSavedDatasets();
         datasets.forEach(ds => {
-          if (savedNames.includes(ds.Name)) {
+          // Compare using trimmed names to be robust to whitespace differences.
+          const name = ds && ds.Name ? String(ds.Name).trim() : '';
+          if (name && savedNames.includes(name)) {
             ds._saved = true;
           }
         });
@@ -509,20 +511,32 @@
 
       // --- LOCAL STORAGE FUNCTIONS ---
       const STORAGE_KEY = 'savedDatasets';
-      
+
+      // Load saved dataset names from localStorage. Return an array of
+      // trimmed string names. Be resilient to malformed values.
       function loadSavedDatasets() {
         try {
-          const saved = localStorage.getItem(STORAGE_KEY);
-          return saved ? JSON.parse(saved) : [];
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return [];
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return [];
+          // keep only non-empty trimmed strings and dedupe
+          const cleaned = parsed.map(x => String(x || '').trim()).filter(Boolean);
+          return Array.from(new Set(cleaned));
         } catch (e) {
           console.error('Failed to load saved datasets:', e);
           return [];
         }
       }
-      
+
+      // Save an array of dataset names (strings) to localStorage. Normalize
+      // by trimming and deduplicating values before storing.
       function saveSavedDatasets(savedNames) {
         try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNames));
+          if (!Array.isArray(savedNames)) savedNames = [];
+          const cleaned = savedNames.map(x => String(x || '').trim()).filter(Boolean);
+          const uniq = Array.from(new Set(cleaned));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(uniq));
         } catch (e) {
           console.error('Failed to save saved datasets:', e);
         }
@@ -742,9 +756,9 @@
         currentDetailDataset._saved = !currentDetailDataset._saved;
         saveDetailBtn.classList.toggle('active', currentDetailDataset._saved);
         
-        // Save to localStorage
-        const savedNames = datasets.filter(ds => ds._saved).map(ds => ds.Name);
-        saveSavedDatasets(savedNames);
+  // Save to localStorage (store trimmed, deduped names)
+  const savedNames = datasets.filter(ds => ds._saved).map(ds => String(ds.Name || '').trim());
+  saveSavedDatasets(savedNames);
         
         filterAndRender(); // Re-render to show star/sort
       });
