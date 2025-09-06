@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Datasets Registry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --bg-light: #1e293b;
+      --panel-bg: #131c31;
+      --border-color: #334155;
+      --text-primary: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #7dd3fc;
+      --yellow: #facc15;
+      --danger: #f87171;
+      --font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    
+    #app-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    .topbar {
+      flex-shrink: 0;
+      padding: 1rem 1.5rem;
+      background-color: var(--bg-dark);
+      border-bottom: 1px solid var(--border-color);
+      z-index: 10;
+    }
+
+    .topbar-row {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .header-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 600;
+        font-size: 1.125rem;
+    }
+
+    #search-container {
+        position: relative;
+        margin-left: auto;
+    }
+    
+    #search {
+      background-color: var(--bg-light);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      padding: 0.5rem 0.75rem 0.5rem 2.25rem;
+      border-radius: 0.5rem;
+      width: 300px;
+      transition: all 150ms ease;
+    }
+    #search:focus {
+        outline: 2px solid var(--accent);
+        border-color: var(--accent);
+        background-color: var(--panel-bg);
+    }
+    #search-container .search-icon {
+        position: absolute;
+        left: 0.75rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-secondary);
+    }
+
+
+    .header-actions {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background-color: var(--bg-light);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 150ms ease;
+    }
+    .btn:hover {
+      background-color: #334155;
+      color: var(--text-primary);
+    }
+    .btn svg {
+        transition: transform 200ms ease;
+    }
+    .btn[aria-pressed="true"] svg.chevron {
+        transform: rotate(180deg);
+    }
+
+    .tagbar {
+      width: 100%;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      transition: max-height 300ms ease-in-out;
+      overflow: hidden;
+    }
+    
+    .tags.collapsed {
+        max-height: 2rem; /* Approx height for one row */
+    }
+
+    .tag {
+      background-color: var(--bg-light);
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 150ms ease;
+      position: relative;
+    }
+    .tag:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .tag.active {
+      background-color: var(--accent);
+      color: var(--bg-dark);
+      font-weight: 600;
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      position: relative;
+    }
+
+    .content {
+      flex: 1;
+      min-width: 0;
+      height: 100%;
+      overflow-y: auto;
+      padding: 1.5rem;
+      transition: padding-right 300ms ease;
+    }
+    .content.panel-open {
+        padding-right: 0.5rem;
+    }
+
+    .table-container {
+      background-color: var(--panel-bg);
+      border-radius: 0.75rem;
+      border: 1px solid var(--border-color);
+      overflow: hidden;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+    }
+
+    .datasets {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .datasets th {
+      text-align: left;
+      font-weight: 600;
+      padding: 0.75rem 1.5rem;
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .datasets td {
+      padding: 1rem 1.5rem;
+      vertical-align: middle;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .datasets tbody tr:last-child td {
+        border-bottom: none;
+    }
+
+    .datasets tbody tr {
+        cursor: pointer;
+        transition: background-color 150ms ease;
+    }
+    .datasets tbody tr:hover {
+        background-color: rgba(56, 189, 248, 0.05);
+    }
+    .datasets tbody tr.saved {
+        background-color: rgba(250, 204, 21, 0.1);
+    }
+    
+    .name-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-weight: 600;
+    }
+    .name-cell .star-icon { color: var(--yellow); }
+    .name-cell .external-link-icon { color: var(--text-secondary); }
+
+    .link {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .link:hover { text-decoration: underline; }
+    
+    .empty-state td {
+        text-align: center;
+        color: var(--text-secondary);
+        padding: 4rem 1rem;
+    }
+
+    .detail-panel {
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: clamp(400px, 40vw, 600px);
+      height: 100%;
+      background-color: var(--bg-dark);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      box-shadow: -12px 0 40px rgba(0, 0, 0, 0.3);
+      transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
+      transform: translateX(100%);
+      z-index: 5;
+    }
+
+    .detail-panel.open {
+      transform: translateX(0);
+    }
+
+    .detail-header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .detail-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-right: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    #saveDetail {
+        color: var(--text-secondary);
+    }
+    #saveDetail.active, #saveDetail:hover {
+        color: var(--yellow);
+    }
+    #saveDetail .star-outline { display: block; }
+    #saveDetail .star-solid { display: none; }
+    #saveDetail.active .star-outline { display: none; }
+    #saveDetail.active .star-solid { display: block; }
+
+    .detail-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem;
+    }
+    .detail-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 1rem;
+      padding: 1rem 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+     .detail-row:first-child { padding-top: 0;}
+     .detail-row:last-child { border-bottom: none; }
+
+    .detail-label {
+      font-weight: 600;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+    .detail-value {
+        font-size: 0.875rem;
+        line-height: 1.6;
+        word-break: break-word;
+    }
+    .detail-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .tag-pill {
+        background: var(--bg-light);
+        border: 1px solid var(--border-color);
+        color: var(--text-secondary);
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 150ms ease;
+    }
+    .tag-pill:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+    }
+    .resource {
+        padding: 1rem;
+        background-color: var(--bg-light);
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+    }
+    .resource:last-child { margin-bottom: 0; }
+    .resource > div { margin-bottom: 0.5rem; }
+    .resource > div:last-child { margin-bottom: 0; }
+    .small { font-size: 0.8rem; color: var(--text-secondary); font-family: monospace; }
+    .daw-section { margin-bottom: 1.5rem; }
+    .daw-item {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .daw-item:last-child { border-bottom: none; }
+
+
+    @media (max-width: 900px) {
+      .detail-panel {
+        width: 80vw;
+      }
+      .topbar-row {
+          flex-wrap: wrap;
+      }
+      #search-container {
+          order: 3;
+          width: 100%;
+          margin-left: 0;
+      }
+      #search {
+          width: 100%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app-container">
+    <header class="topbar">
+      <div class="topbar-row">
+        <div class="header-title">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13 10V3.33782C13 2.80111 13.4582 2.44304 13.9577 2.58334L20.9577 4.58334C21.5073 4.7359 21.8333 5.30231 21.6808 5.85195L19.6808 12.852C19.5282 13.4016 18.9618 13.7276 18.4122 13.5751L14 12.3333V19.4167L19.0423 21.4577C19.5418 21.598 19.8999 22.1562 19.7596 22.6557C19.6193 23.1552 19.0611 23.5133 18.5616 23.373L3.5616 19.373C3.06211 19.2327 2.70399 18.6745 2.84429 18.175L4.84429 11.175C4.98459 10.6755 5.54279 10.3174 6.04228 10.4577L13 12.3333V10Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="var(--accent)" opacity="0.3" />
+            <path d="M13 10V12.3333L6.04228 10.4577C5.54279 10.3174 4.98459 10.6755 4.84429 11.175L2.84429 18.175C2.70399 18.6745 3.06211 19.2327 3.5616 19.373L13 12.3333" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>Open Data Registry</span>
+        </div>
+        <div id="search-container">
+            <div class="search-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </div>
+          <input id="search" placeholder="Search datasets..." aria-label="Search datasets" />
+        </div>
+        <div class="header-actions">
+          <button id="toggleTags" class="btn" aria-pressed="false" aria-label="Toggle tags">
+            <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="btn-label">Show all</span>
+          </button>
+          <button id="clearFilters" class="btn" aria-label="Clear filters">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span class="btn-label">Clear</span>
+          </button>
+        </div>
+      </div>
+      <div class="tagbar">
+        <div id="tagList" class="tags collapsed"></div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section id="content" class="content">
+        <div class="table-container">
+          <table id="datasetsTable" class="datasets">
+            <thead>
+              <tr>
+                <th style="width: 40%;">Name</th>
+                <th style="width: 30%;">Managed By</th>
+                <th style="width: 30%;">Update Frequency</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              <!-- rows inserted by script -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <aside id="detailPanel" class="detail-panel" aria-hidden="true">
+        <div class="detail-header">
+          <div id="detailTitle" class="detail-title"></div>
+          <button id="saveDetail" class="btn" aria-label="Save dataset" title="Save dataset">
+            <svg class="star-outline" width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            </svg>
+            <svg class="star-solid" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/>
+            </svg>
+          </button>
+          <button id="closeDetail" class="btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div id="detailBody" class="detail-body"></div>
+      </aside>
+    </main>
+  </div>
+
+  <script>
+    (async function() {
+      const dataUrl = 'data.json';
+
+      const tableBody = document.getElementById('tableBody');
+      const tagListEl = document.getElementById('tagList');
+      const searchEl = document.getElementById('search');
+      const clearBtn = document.getElementById('clearFilters');
+      const contentEl = document.getElementById('content');
+
+      let datasets = [];
+      try {
+        const resp = await fetch(dataUrl);
+        if (!resp.ok) {
+          throw new Error(`HTTP error! status: ${resp.status}`);
+        }
+        datasets = await resp.json();
+        
+        // Load saved datasets from localStorage
+        const savedNames = loadSavedDatasets();
+        datasets.forEach(ds => {
+          if (savedNames.includes(ds.Name)) {
+            ds._saved = true;
+          }
+        });
+      } catch (e) {
+        console.error("Failed to load data.json", e);
+        tableBody.innerHTML = '<tr class="empty-state"><td colspan="3">Failed to load dataset registry.</td></tr>';
+      }
+
+      // --- UTILITY FUNCTIONS ---
+      const escapeHtml = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const stripMd = (s) => (s || '').replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1');
+      const extractUrl = (s) => {
+        if (!s) return null;
+        const m = s.match(/\((https?:\/\/[^\s)]+)\)/);
+        if (m) return m[1];
+        if (/^https?:\/\//i.test(s)) return s;
+        return null;
+      };
+      const mdToHtml = (text) => {
+        if (!text) return '';
+        return escapeHtml(text).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a class="link" href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
+      };
+
+      // --- LOCAL STORAGE FUNCTIONS ---
+      const STORAGE_KEY = 'savedDatasets';
+      
+      function loadSavedDatasets() {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+          console.error('Failed to load saved datasets:', e);
+          return [];
+        }
+      }
+      
+      function saveSavedDatasets(savedNames) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(savedNames));
+        } catch (e) {
+          console.error('Failed to save saved datasets:', e);
+        }
+      }
+
+      // --- STATE ---
+      let tagBarExpanded = false;
+      let activeTag = null;
+      let currentDetailDataset = null;
+
+      // --- RENDER FUNCTIONS ---
+      function renderTopTagsFor(items) {
+        tagListEl.innerHTML = '';
+        const countMap = items.reduce((acc, d) => {
+          (d.Tags || []).forEach(t => { acc[t] = (acc[t] || 0) + 1; });
+          return acc;
+        }, {});
+        
+        const sortedTags = Object.keys(countMap).sort((a,b) => {
+          if (a === activeTag) return -1;
+          if (b === activeTag) return 1;
+          return a.localeCompare(b);
+        });
+        
+        sortedTags.forEach(t => {
+            const el = document.createElement('button');
+            el.className = 'tag';
+            el.textContent = `${t} (${countMap[t]})`;
+            el.dataset.tag = t;
+            const isActive = t === activeTag;
+            el.classList.toggle('active', isActive);
+            el.setAttribute('aria-pressed', String(isActive));
+            tagListEl.appendChild(el);
+        });
+
+        tagListEl.classList.toggle('collapsed', !tagBarExpanded);
+      }
+
+      function renderRows(items) {
+        tableBody.innerHTML = '';
+        if (items.length === 0) {
+          tableBody.innerHTML = '<tr class="empty-state"><td colspan="3">No datasets match the current filters.</td></tr>';
+          return;
+        }
+
+        // Sort saved items to the top
+        items.sort((a, b) => (b._saved ? 1 : 0) - (a._saved ? 1 : 0));
+
+        items.forEach((ds) => {
+          const tr = document.createElement('tr');
+          tr.tabIndex = 0;
+          if (ds._saved) {
+            tr.classList.add('saved');
+          }
+          
+          // Name cell
+          const nameTd = document.createElement('td');
+          nameTd.className = 'name-cell';
+          let nameContent = '';
+          if (ds._saved) {
+              nameContent += `<svg class="star-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/></svg>`;
+          }
+          if (ds.Documentation) {
+            nameContent += `<a class="link" href="${escapeHtml(ds.Documentation)}" target="_blank" rel="noreferrer noopener">${escapeHtml(ds.Name || '—')}</a> <svg class="external-link-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
+          } else {
+            nameContent += `<span>${escapeHtml(ds.Name || '—')}</span>`;
+          }
+          nameTd.innerHTML = nameContent;
+          tr.appendChild(nameTd);
+
+          // Managed By cell
+          const manTd = document.createElement('td');
+          const mUrl = extractUrl(ds.ManagedBy);
+          manTd.innerHTML = ds.ManagedBy ? (mUrl ? `<a class="link" href="${mUrl}" target="_blank" rel="noreferrer noopener">${escapeHtml(stripMd(ds.ManagedBy))}</a>` : escapeHtml(stripMd(ds.ManagedBy))) : '—';
+          tr.appendChild(manTd);
+          
+          // Update Frequency cell
+          const ufTd = document.createElement('td');
+          ufTd.textContent = ds.UpdateFrequency || '—';
+          tr.appendChild(ufTd);
+
+          tr.addEventListener('click', () => openDetail(ds));
+          tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openDetail(ds); });
+
+          tableBody.appendChild(tr);
+        });
+      }
+
+      function filterAndRender() {
+        const q = (searchEl.value || '').trim().toLowerCase();
+        const filtered = datasets.filter(d => {
+          if (activeTag && !(d.Tags || []).includes(activeTag)) {
+            return false;
+          }
+          if (q) {
+            const hay = [d.Name, d.Description, ...(d.Tags || []), d.ManagedBy].join(' ').toLowerCase();
+            return hay.includes(q);
+          }
+          return true;
+        });
+
+        renderTopTagsFor(filtered);
+        renderRows(filtered);
+      }
+
+      // --- DETAIL PANEL ---
+      const detailPanel = document.getElementById('detailPanel');
+      const detailTitle = document.getElementById('detailTitle');
+      const detailBody = document.getElementById('detailBody');
+      const closeDetailBtn = document.getElementById('closeDetail');
+      const saveDetailBtn = document.getElementById('saveDetail');
+
+      function openDetail(ds) {
+        detailTitle.textContent = ds.Name || '';
+        currentDetailDataset = ds;
+        
+        detailBody.innerHTML = '';
+        const addRow = (label, content) => {
+            if (!content) return;
+            const el = document.createElement('div');
+            el.className = 'detail-row';
+            el.innerHTML = `<div class="detail-label">${label}</div><div class="detail-value">${content}</div>`;
+            detailBody.appendChild(el);
+        };
+        
+        addRow('Managed By', mdToHtml(ds.ManagedBy));
+        addRow('Contact', mdToHtml(ds.Contact));
+        addRow('Update Frequency', escapeHtml(ds.UpdateFrequency));
+
+        if (ds.Tags?.length) {
+            addRow('Tags', `<div class="detail-tags">${ds.Tags.map(t => `<button class="tag-pill" data-tag="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join('')}</div>`);
+        }
+        
+        addRow('Description', mdToHtml(ds.Description));
+        addRow('License', mdToHtml(ds.License));
+
+        if (ds.Resources?.length) {
+            const resourcesHtml = ds.Resources.map(r => {
+                let s = '';
+                if (r.Type) s += `<div><strong>${escapeHtml(r.Type)}</strong></div>`;
+                if (r.Description) s += `<div>${mdToHtml(r.Description)}</div>`;
+                if (r.ARN) s += `<div class="small">${escapeHtml(r.ARN)}</div>`;
+                if (r.Explore) s += r.Explore.map(link => `<div><a class="link" href="${extractUrl(link)}" target="_blank" rel="noreferrer noopener">${escapeHtml(stripMd(link))}</a></div>`).join('');
+                return `<div class="resource">${s}</div>`;
+            }).join('');
+            addRow('Resources', resourcesHtml);
+        }
+
+        const dataAtWork = ds.DataAtWork || ds.DataAtWorkLink || ds.DataAt_Work;
+        if (dataAtWork) {
+            let dawHtml = '';
+            if (typeof dataAtWork === 'object' && !Array.isArray(dataAtWork)) {
+                Object.entries(dataAtWork).forEach(([sectionKey, sec]) => {
+                    if (Array.isArray(sec)) {
+                        const itemsHtml = sec.map(item => {
+                            if (typeof item === 'object') {
+                                let line = '';
+                                if (item.Title) {
+                                    line += item.URL ? `<div><a class="link" href="${escapeHtml(item.URL)}" target="_blank" rel="noreferrer noopener">${escapeHtml(item.Title)}</a></div>` : `<div>${escapeHtml(item.Title)}</div>`;
+                                }
+                                if (item.AuthorName) line += `<div class="small">${escapeHtml(item.AuthorName)}</div>`;
+                                return `<div class="daw-item">${line}</div>`;
+                            }
+                            return `<div class="daw-item">${mdToHtml(item)}</div>`;
+                        }).join('');
+                        dawHtml += `<div class="daw-section"><strong>${escapeHtml(sectionKey)}</strong>${itemsHtml}</div>`;
+                    } else if (typeof sec === 'string') {
+                        dawHtml += `<div class="daw-section"><strong>${escapeHtml(sectionKey)}</strong><div>${mdToHtml(sec)}</div></div>`;
+                    }
+                });
+            } else {
+                dawHtml = mdToHtml(dataAtWork);
+            }
+            addRow('DataAtWork', dawHtml);
+        }
+
+        saveDetailBtn.classList.toggle('active', !!ds._saved);
+        detailPanel.classList.add('open');
+        detailPanel.setAttribute('aria-hidden', 'false');
+        contentEl.classList.add('panel-open');
+      }
+
+      function closeDetailPanel() {
+        detailPanel.classList.remove('open');
+        detailPanel.setAttribute('aria-hidden', 'true');
+        contentEl.classList.remove('panel-open');
+      }
+
+      // --- EVENT LISTENERS ---
+      searchEl.addEventListener('input', filterAndRender);
+      
+      clearBtn.addEventListener('click', () => {
+        activeTag = null;
+        searchEl.value = '';
+        filterAndRender();
+      });
+
+      document.getElementById('toggleTags').addEventListener('click', (e) => {
+        const btn = e.currentTarget;
+        tagBarExpanded = !tagBarExpanded;
+        btn.setAttribute('aria-pressed', String(tagBarExpanded));
+        btn.querySelector('.btn-label').textContent = tagBarExpanded ? 'Show less' : 'Show all';
+        tagListEl.classList.toggle('collapsed', !tagBarExpanded);
+      });
+
+      tagListEl.addEventListener('click', e => {
+        const t = e.target.closest('.tag');
+        if (!t) return;
+        activeTag = activeTag === t.dataset.tag ? null : t.dataset.tag;
+        filterAndRender();
+      });
+
+      closeDetailBtn.addEventListener('click', closeDetailPanel);
+      
+      saveDetailBtn.addEventListener('click', () => {
+        if (!currentDetailDataset) return;
+        currentDetailDataset._saved = !currentDetailDataset._saved;
+        saveDetailBtn.classList.toggle('active', currentDetailDataset._saved);
+        
+        // Save to localStorage
+        const savedNames = datasets.filter(ds => ds._saved).map(ds => ds.Name);
+        saveSavedDatasets(savedNames);
+        
+        filterAndRender(); // Re-render to show star/sort
+      });
+      
+      detailBody.addEventListener('click', e => {
+        const btn = e.target.closest('.tag-pill');
+        if (!btn) return;
+        activeTag = activeTag === btn.dataset.tag ? null : btn.dataset.tag;
+        filterAndRender();
+        closeDetailPanel();
+      });
+
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') closeDetailPanel();
+      });
+
+      // --- INITIALIZATION ---
+      filterAndRender();
+
+    })();
+  </script>
+</body>
+</html>
