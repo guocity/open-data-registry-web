@@ -436,8 +436,7 @@
               </tr>
             </thead>
             <tbody id="tableBody">
-              <!-- rows inserted by script -->
-            </tbody>
+              </tbody>
           </table>
         </div>
       </section>
@@ -753,14 +752,21 @@
       
       saveDetailBtn.addEventListener('click', () => {
         if (!currentDetailDataset) return;
+        
+        // Toggle in-memory state and UI class
         currentDetailDataset._saved = !currentDetailDataset._saved;
         saveDetailBtn.classList.toggle('active', currentDetailDataset._saved);
         
-  // Save to localStorage (store trimmed, deduped names)
-  const savedNames = datasets.filter(ds => ds._saved).map(ds => String(ds.Name || '').trim());
-  saveSavedDatasets(savedNames);
+        // Rebuild the complete list of saved dataset names from the master `datasets` array.
+        // This is the most reliable way to keep localStorage in sync with the app's state.
+        const allSavedNames = datasets
+          .filter(ds => ds._saved)
+          .map(ds => String(ds.Name || '').trim());
         
-        filterAndRender(); // Re-render to show star/sort
+        saveSavedDatasets(allSavedNames);
+        
+        // Re-render the table to show the new saved state and sorting
+        filterAndRender();
       });
       
       detailBody.addEventListener('click', e => {
