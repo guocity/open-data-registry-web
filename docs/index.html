@@ -130,6 +130,22 @@
     .btn[aria-pressed="true"] svg.chevron {
         transform: rotate(180deg);
     }
+    
+    select.btn {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem;
+    }
+
+    #updateFrequencyFilter {
+        max-width: 200px;
+    }
+
 
     .tagbar {
       width: 100%;
@@ -243,7 +259,6 @@
         gap: 0.75rem;
         font-weight: 600;
     }
-    .name-cell .star-icon { color: var(--yellow); }
     .name-cell .external-link-icon { color: var(--text-secondary); }
 
     .link {
@@ -405,6 +420,9 @@
           <input id="search" placeholder="Search datasets..." aria-label="Search datasets" />
         </div>
         <div class="header-actions">
+           <select id="updateFrequencyFilter" class="btn" aria-label="Filter by Update Frequency">
+                <option value="">All Frequencies</option>
+            </select>
           <button id="toggleTags" class="btn" aria-pressed="false" aria-label="Toggle tags">
             <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
@@ -464,28 +482,53 @@
   <script>
     (async function() {
       const dataUrl = 'data.json';
-
+      const STORAGE_KEY = 'savedDatasets';
+      
+      // --- DOM ELEMENTS ---
       const tableBody = document.getElementById('tableBody');
       const tagListEl = document.getElementById('tagList');
       const searchEl = document.getElementById('search');
       const clearBtn = document.getElementById('clearFilters');
       const contentEl = document.getElementById('content');
+      const detailPanel = document.getElementById('detailPanel');
+      const detailTitle = document.getElementById('detailTitle');
+      const detailBody = document.getElementById('detailBody');
+      const closeDetailBtn = document.getElementById('closeDetail');
+      const saveDetailBtn = document.getElementById('saveDetail');
+      const frequencyFilterEl = document.getElementById('updateFrequencyFilter');
 
       let datasets = [];
+
+      // --- DATA LOADING ---
       try {
         const resp = await fetch(dataUrl);
-        if (!resp.ok) {
-          throw new Error(`HTTP error! status: ${resp.status}`);
-        }
+        if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
         datasets = await resp.json();
-        
+
+        // **Apply saved state from localStorage on initial load**
+        console.log("--- Applying saved state on page load ---");
         const savedNames = loadSavedDatasets();
         datasets.forEach(ds => {
           const name = ds && ds.Name ? String(ds.Name).trim() : '';
           if (name && savedNames.includes(name)) {
             ds._saved = true;
+             console.log(`[INIT] Applied saved state to: "${name}"`);
+          } else {
+            ds._saved = false;
           }
         });
+        console.log("--- Finished applying initial saved state ---");
+        
+        // ** Populate Frequency Dropdown **
+        const frequencies = [...new Set(datasets.map(d => d.UpdateFrequency).filter(Boolean))].sort();
+        frequencies.forEach(freq => {
+            const option = document.createElement('option');
+            option.value = freq;
+            option.textContent = freq;
+            frequencyFilterEl.appendChild(option);
+        });
+
+
       } catch (e) {
         console.error("Failed to load data.json", e);
         tableBody.innerHTML = '<tr class="empty-state"><td colspan="3">Failed to load dataset registry.</td></tr>';
@@ -506,35 +549,33 @@
         return escapeHtml(text).replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a class="link" href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
       };
 
-      // --- LOCAL STORAGE FUNCTIONS ---
-      const STORAGE_KEY = 'savedDatasets';
-
+      // --- LOCAL STORAGE FUNCTIONS (FOR SAVED/STARRED ITEMS) ---
       function loadSavedDatasets() {
         try {
           const raw = localStorage.getItem(STORAGE_KEY);
+          console.log(`[LOAD] Retrieved from localStorage:`, raw);
           if (!raw) return [];
           const parsed = JSON.parse(raw);
-          if (!Array.isArray(parsed)) return [];
-          const cleaned = parsed.map(x => String(x || '').trim()).filter(Boolean);
-          return Array.from(new Set(cleaned));
+          const result = Array.isArray(parsed) ? parsed : [];
+          console.log(`[LOAD] Parsed saved dataset names:`, result);
+          return result;
         } catch (e) {
-          console.error('Failed to load saved datasets:', e);
+          console.error('Failed to load saved datasets from localStorage:', e);
           return [];
         }
       }
 
       function saveSavedDatasets(savedNames) {
         try {
-          if (!Array.isArray(savedNames)) savedNames = [];
-          const cleaned = savedNames.map(x => String(x || '').trim()).filter(Boolean);
-          const uniq = Array.from(new Set(cleaned));
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(uniq));
+          const dataToStore = JSON.stringify(savedNames);
+          console.log(`[SAVE] Saving to localStorage:`, dataToStore);
+          localStorage.setItem(STORAGE_KEY, dataToStore);
         } catch (e) {
-          console.error('Failed to save saved datasets:', e);
+          console.error('Failed to save datasets to localStorage:', e);
         }
       }
 
-      // --- STATE ---
+      // --- STATE MANAGEMENT ---
       let tagBarExpanded = false;
       let activeTag = null;
       let currentDetailDataset = null;
@@ -563,7 +604,6 @@
             el.setAttribute('aria-pressed', String(isActive));
             tagListEl.appendChild(el);
         });
-
         tagListEl.classList.toggle('collapsed', !tagBarExpanded);
       }
 
@@ -574,69 +614,64 @@
           return;
         }
 
-        items.sort((a, b) => (b._saved ? 1 : 0) - (a._saved ? 1 : 0));
+        // **Sort to make starred items stick to the top, then sort alphabetically**
+        items.sort((a, b) => {
+            const savedSort = (b._saved ? 1 : 0) - (a._saved ? 1 : 0);
+            if (savedSort !== 0) return savedSort;
+            return (a.Name || '').localeCompare(b.Name || '');
+        });
 
         items.forEach((ds) => {
           const tr = document.createElement('tr');
           tr.tabIndex = 0;
-          if (ds._saved) {
-            tr.classList.add('saved');
-          }
+          tr.classList.toggle('saved', !!ds._saved);
           
-          const nameTd = document.createElement('td');
-          nameTd.className = 'name-cell';
           let nameContent = '';
-          if (ds._saved) {
-              nameContent += `<svg class="star-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/></svg>`;
-          }
           if (ds.Documentation) {
             nameContent += `<a class="link" href="${escapeHtml(ds.Documentation)}" target="_blank" rel="noreferrer noopener">${escapeHtml(ds.Name || '—')}</a> <svg class="external-link-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`;
           } else {
             nameContent += `<span>${escapeHtml(ds.Name || '—')}</span>`;
           }
-          nameTd.innerHTML = nameContent;
-          tr.appendChild(nameTd);
-
-          const manTd = document.createElement('td');
-          const mUrl = extractUrl(ds.ManagedBy);
-          manTd.innerHTML = ds.ManagedBy ? (mUrl ? `<a class="link" href="${mUrl}" target="_blank" rel="noreferrer noopener">${escapeHtml(stripMd(ds.ManagedBy))}</a>` : escapeHtml(stripMd(ds.ManagedBy))) : '—';
-          tr.appendChild(manTd);
           
-          const ufTd = document.createElement('td');
-          ufTd.textContent = ds.UpdateFrequency || '—';
-          tr.appendChild(ufTd);
+          const mUrl = extractUrl(ds.ManagedBy);
+          const managedByContent = ds.ManagedBy ? (mUrl ? `<a class="link" href="${mUrl}" target="_blank" rel="noreferrer noopener">${escapeHtml(stripMd(ds.ManagedBy))}</a>` : escapeHtml(stripMd(ds.ManagedBy))) : '—';
+          
+          tr.innerHTML = `
+            <td class="name-cell">${nameContent}</td>
+            <td>${managedByContent}</td>
+            <td>${escapeHtml(ds.UpdateFrequency || '—')}</td>
+          `;
 
           tr.addEventListener('click', () => openDetail(ds));
           tr.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') openDetail(ds); });
-
           tableBody.appendChild(tr);
         });
       }
 
       function filterAndRender() {
         const q = (searchEl.value || '').trim().toLowerCase();
+        const selectedFrequency = frequencyFilterEl.value;
+
         const filtered = datasets.filter(d => {
-          if (activeTag && !(d.Tags || []).includes(activeTag)) {
-            return false;
-          }
+          // Filter by Active Tag
+          if (activeTag && !(d.Tags || []).includes(activeTag)) return false;
+
+          // Filter by Update Frequency
+          if (selectedFrequency && d.UpdateFrequency !== selectedFrequency) return false;
+
+          // Filter by Search Query
           if (q) {
             const hay = [d.Name, d.Description, ...(d.Tags || []), d.ManagedBy].join(' ').toLowerCase();
             return hay.includes(q);
           }
+          
           return true;
         });
-
         renderTopTagsFor(filtered);
         renderRows(filtered);
       }
 
       // --- DETAIL PANEL ---
-      const detailPanel = document.getElementById('detailPanel');
-      const detailTitle = document.getElementById('detailTitle');
-      const detailBody = document.getElementById('detailBody');
-      const closeDetailBtn = document.getElementById('closeDetail');
-      const saveDetailBtn = document.getElementById('saveDetail');
-
       function openDetail(ds) {
         detailTitle.textContent = ds.Name || '';
         currentDetailDataset = ds;
@@ -675,28 +710,24 @@
 
         const dataAtWork = ds.DataAtWork || ds.DataAtWorkLink || ds.DataAt_Work;
         if (dataAtWork) {
-            let dawHtml = '';
+            let dawHtml = typeof dataAtWork === 'string' ? mdToHtml(dataAtWork) : '';
             if (typeof dataAtWork === 'object' && !Array.isArray(dataAtWork)) {
-                Object.entries(dataAtWork).forEach(([sectionKey, sec]) => {
+                dawHtml = Object.entries(dataAtWork).map(([sectionKey, sec]) => {
+                    let itemsHtml = '';
                     if (Array.isArray(sec)) {
-                        const itemsHtml = sec.map(item => {
+                        itemsHtml = sec.map(item => {
                             if (typeof item === 'object') {
-                                let line = '';
-                                if (item.Title) {
-                                    line += item.URL ? `<div><a class="link" href="${escapeHtml(item.URL)}" target="_blank" rel="noreferrer noopener">${escapeHtml(item.Title)}</a></div>` : `<div>${escapeHtml(item.Title)}</div>`;
-                                }
+                                let line = item.URL ? `<div><a class="link" href="${escapeHtml(item.URL)}" target="_blank" rel="noreferrer noopener">${escapeHtml(item.Title)}</a></div>` : `<div>${escapeHtml(item.Title)}</div>`;
                                 if (item.AuthorName) line += `<div class="small">${escapeHtml(item.AuthorName)}</div>`;
                                 return `<div class="daw-item">${line}</div>`;
                             }
                             return `<div class="daw-item">${mdToHtml(item)}</div>`;
                         }).join('');
-                        dawHtml += `<div class="daw-section"><strong>${escapeHtml(sectionKey)}</strong>${itemsHtml}</div>`;
                     } else if (typeof sec === 'string') {
-                        dawHtml += `<div class="daw-section"><strong>${escapeHtml(sectionKey)}</strong><div>${mdToHtml(sec)}</div></div>`;
+                        itemsHtml = `<div>${mdToHtml(sec)}</div>`;
                     }
-                });
-            } else {
-                dawHtml = mdToHtml(dataAtWork);
+                    return `<div class="daw-section"><strong>${escapeHtml(sectionKey)}</strong>${itemsHtml}</div>`;
+                }).join('');
             }
             addRow('DataAtWork', dawHtml);
         }
@@ -711,14 +742,17 @@
         detailPanel.classList.remove('open');
         detailPanel.setAttribute('aria-hidden', 'true');
         contentEl.classList.remove('panel-open');
+        currentDetailDataset = null;
       }
 
       // --- EVENT LISTENERS ---
       searchEl.addEventListener('input', filterAndRender);
+      frequencyFilterEl.addEventListener('change', filterAndRender);
       
       clearBtn.addEventListener('click', () => {
         activeTag = null;
         searchEl.value = '';
+        frequencyFilterEl.value = '';
         filterAndRender();
       });
 
@@ -739,51 +773,69 @@
 
       closeDetailBtn.addEventListener('click', closeDetailPanel);
       
-      // --- FIX START: This logic is now more robust ---
+      // --- REFINED SAVE/STAR LOGIC ---
       saveDetailBtn.addEventListener('click', () => {
         if (!currentDetailDataset) return;
+        console.log(`--- Toggling Save State for: "${currentDetailDataset.Name}" ---`);
 
-        // 1. Determine the new state
-        const willBeSaved = !currentDetailDataset._saved;
+        // 1. Toggle the saved state on the dataset object in memory
+        currentDetailDataset._saved = !currentDetailDataset._saved;
+        console.log(`[TOGGLE] In-memory state is now _saved: ${currentDetailDataset._saved}`);
+
+        // 2. Update the star button's appearance immediately
+        saveDetailBtn.classList.toggle('active', currentDetailDataset._saved);
+        
         const currentName = String(currentDetailDataset.Name || '').trim();
-
         if (!currentName) {
-            console.warn("Attempted to save an item with no name.");
+            console.warn("Cannot save a dataset with no name.");
+            filterAndRender();
             return;
         }
 
-        // 2. Read the list directly from storage to ensure it's the most current version
+        // 3. Load the current list of saved names from storage to ensure we have the latest version
         let savedNames = loadSavedDatasets();
-        const isCurrentlyInStorage = savedNames.includes(currentName);
 
-        // 3. Add or remove the item from the list
-        if (willBeSaved && !isCurrentlyInStorage) {
-            savedNames.push(currentName);
-        } else if (!willBeSaved && isCurrentlyInStorage) {
-            // This logic assumes dataset names are unique identifiers for saving.
+        // 4. Add or remove the dataset's name from the list
+        if (currentDetailDataset._saved) {
+            // Add the name if it's not already in the list
+            if (!savedNames.includes(currentName)) {
+                savedNames.push(currentName);
+                console.log(`[TOGGLE] Added "${currentName}" to the list of saved names.`);
+            } else {
+                console.log(`[TOGGLE] "${currentName}" was already in the list.`);
+            }
+        } else {
+            // Remove the name by filtering the list
+            const initialLength = savedNames.length;
             savedNames = savedNames.filter(name => name !== currentName);
+            if(savedNames.length < initialLength) {
+                console.log(`[TOGGLE] Removed "${currentName}" from the list of saved names.`);
+            } else {
+                console.log(`[TOGGLE] "${currentName}" was not in the list to remove.`);
+            }
         }
-
-        // 4. Save the modified list back to storage immediately
+        
+        // 5. Save the updated list (an array of string names) back to storage
         saveSavedDatasets(savedNames);
-
-        // 5. Update the in-memory object and UI to reflect the change
-        currentDetailDataset._saved = willBeSaved;
-        saveDetailBtn.classList.toggle('active', willBeSaved);
+        
+        // 6. Re-render the main table to reflect the change (e.g., sorting, star icon).
+        // This does not re-fetch or re-load data; it just redraws the UI based on the current in-memory state.
+        console.log("[TOGGLE] Re-rendering the table to reflect changes.");
         filterAndRender();
       });
-      // --- FIX END ---
       
       detailBody.addEventListener('click', e => {
         const btn = e.target.closest('.tag-pill');
         if (!btn) return;
-        activeTag = activeTag === btn.dataset.tag ? null : btn.dataset.tag;
+        activeTag = btn.dataset.tag;
         filterAndRender();
         closeDetailPanel();
       });
 
       document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') closeDetailPanel();
+        if (e.key === 'Escape' && detailPanel.classList.contains('open')) {
+            closeDetailPanel();
+        }
       });
 
       // --- INITIALIZATION ---
